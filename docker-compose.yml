@@ -1,0 +1,42 @@
+# Note: Postgres itself is not run here — the backend talks to a Supabase
+# project (hosted, or run locally via `supabase start` if you have the
+# Supabase CLI). Apply backend/supabase/schema.sql to that project once
+# before first run. See README "Setup".
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      INGEST_URL: http://localhost:4000/api/ingest
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_PROXY: http://backend:4000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

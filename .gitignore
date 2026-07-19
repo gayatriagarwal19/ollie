@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+.npm/
+build/
+
+# Supabase
+supabase/.temp/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

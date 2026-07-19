@@ -1,0 +1,13 @@
+[project]
+name = "ollie-sdk"
+version = "1.0.0"
+description = "Lightweight, auto-instrumenting wrapper around LLM provider calls."
+requires-python = ">=3.10"
+dependencies = ["httpx"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ollie_sdk*"]
