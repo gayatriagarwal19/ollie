@@ -7,6 +7,7 @@ export default function App() {
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [activeConversation, setActiveConversation] = useState(null);
+  const [sessionKey, setSessionKey] = useState("new");
 
   const refreshList = useCallback(async () => {
     setConversations(await listConversations());
@@ -21,11 +22,13 @@ export default function App() {
 
   function handleSelect(id) {
     setActiveId(id);
+    setSessionKey(id);
   }
 
   function handleNew() {
     setActiveId(null);
     setActiveConversation(null);
+    setSessionKey(Date.now().toString());
   }
 
   function handleConversationCreated(newId) {
@@ -42,7 +45,7 @@ export default function App() {
         onNew={handleNew}
       />
       <ChatWindow
-        key={activeId ?? "new"}
+        key={sessionKey}
         conversation={activeConversation}
         conversationId={activeId}
         onConversationCreated={handleConversationCreated}

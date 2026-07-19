@@ -44,7 +44,7 @@ export default function ChatWindow({ conversation, conversationId, onConversatio
       { conversationId, model, message: currentInput },
       {
         conversation: ({ conversationId: newId }) => {
-          if (!conversationId) onConversationCreated?.(newId);
+          if (!conversationId) draftRef.currentNewId = newId;
         },
         delta: ({ delta }) => {
           draftRef.current += delta;
@@ -53,14 +53,25 @@ export default function ChatWindow({ conversation, conversationId, onConversatio
         done: () => {
           setMessages((prev) => [...prev, { id: `local-r-${Date.now()}`, role: "ASSISTANT", content: draftRef.current }]);
           setStreaming(false);
-          onMessagesChange?.();
+          
+          if (!conversationId && draftRef.currentNewId) {
+            onConversationCreated?.(draftRef.currentNewId);
+          } else {
+            onMessagesChange?.();
+          }
         },
         cancelled: () => {
           setStreaming(false);
+          if (!conversationId && draftRef.currentNewId) {
+            onConversationCreated?.(draftRef.currentNewId);
+          }
         },
         error: ({ message }) => {
           setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: "SYSTEM", content: `Error: ${message}` }]);
           setStreaming(false);
+          if (!conversationId && draftRef.currentNewId) {
+            onConversationCreated?.(draftRef.currentNewId);
+          }
         },
       }
     );
