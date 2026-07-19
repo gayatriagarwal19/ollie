@@ -3,12 +3,13 @@ import json
 import os
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ollie_sdk import OllieSDK
 
+from ..auth import get_current_user
 from ..db import supabase
 from ..llm.router import get_provider
 
@@ -36,11 +37,12 @@ def _sse(event: str, data: dict) -> str:
 
 
 @router.get("/conversations")
-async def list_conversations():
-    """List conversations, most recently active first."""
+async def list_conversations(user: dict = Depends(get_current_user)):
+    """List conversations for the current user, most recently active first."""
     res = (
         supabase.table("conversations")
         .select("*, messages(count)")
+        .eq("user_id", user["id"])
         .order("updated_at", desc=True)
         .execute()
     )
@@ -53,9 +55,15 @@ async def list_conversations():
 
 
 @router.get("/conversations/{conversation_id}")
-async def get_conversation(conversation_id: str):
+async def get_conversation(conversation_id: str, user: dict = Depends(get_current_user)):
     """Resume a conversation: full message history."""
-    conv_res = supabase.table("conversations").select("*").eq("id", conversation_id).execute()
+    conv_res = (
+        supabase.table("conversations")
+        .select("*")
+        .eq("id", conversation_id)
+        .eq("user_id", user["id"])
+        .execute()
+    )
     if not conv_res.data:
         raise HTTPException(status_code=404, detail="not_found")
 
@@ -70,30 +78,36 @@ async def get_conversation(conversation_id: str):
 
 
 @router.post("/conversations/{conversation_id}/cancel")
-async def cancel_conversation(conversation_id: str):
+async def cancel_conversation(conversation_id: str, user: dict = Depends(get_current_user)):
     """Cancel an in-flight generation."""
     task = active_generations.pop(conversation_id, None)
     if task:
         task.cancel()
 
-    supabase.table("conversations").update({"status": "CANCELLED"}).eq("id", conversation_id).execute()
+    supabase.table("conversations").update({"status": "CANCELLED"}).eq("id", conversation_id).eq("user_id", user["id"]).execute()
     return {"status": "cancelled"}
 
 
 @router.post("/chat")
-async def chat(payload: SendMessage):
+async def chat(payload: SendMessage, user: dict = Depends(get_current_user)):
     """
     Send a message, stream the assistant's reply back over SSE. Maintains
     short conversational context by loading the last N messages for the
     conversation and passing them to the model.
     """
     if payload.conversationId:
-        conv_res = supabase.table("conversations").select("*").eq("id", payload.conversationId).execute()
+        conv_res = (
+            supabase.table("conversations")
+            .select("*")
+            .eq("id", payload.conversationId)
+            .eq("user_id", user["id"])
+            .execute()
+        )
         if not conv_res.data:
             raise HTTPException(status_code=404, detail="not_found")
         conversation = conv_res.data[0]
     else:
-        ins_res = supabase.table("conversations").insert({"title": payload.message[:60]}).execute()
+        ins_res = supabase.table("conversations").insert({"title": payload.message[:60], "user_id": user["id"]}).execute()
         conversation = ins_res.data[0]
 
     supabase.table("messages").insert({

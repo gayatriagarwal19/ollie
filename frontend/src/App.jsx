@@ -1,24 +1,44 @@
 import { useEffect, useState, useCallback } from "react";
+import { supabase } from "./supabase.js";
+import AuthPage from "./components/AuthPage.jsx";
 import ConversationList from "./components/ConversationList.jsx";
 import ChatWindow from "./components/ChatWindow.jsx";
 import { listConversations, getConversation } from "./api.js";
 
 export default function App() {
+  const [session, setSession] = useState(undefined); // undefined = loading
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [activeConversation, setActiveConversation] = useState(null);
   const [sessionKey, setSessionKey] = useState("new");
 
-  const refreshList = useCallback(async () => {
-    setConversations(await listConversations());
+  // Subscribe to Supabase auth changes
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        // Clear state on logout
+        setConversations([]);
+        setActiveId(null);
+        setActiveConversation(null);
+        setSessionKey("new");
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
+
+  const refreshList = useCallback(async () => {
+    if (!session) return;
+    setConversations(await listConversations(session.access_token));
+  }, [session]);
 
   useEffect(() => { refreshList(); }, [refreshList]);
 
   useEffect(() => {
-    if (!activeId) { setActiveConversation(null); return; }
-    getConversation(activeId).then(setActiveConversation);
-  }, [activeId]);
+    if (!activeId || !session) { setActiveConversation(null); return; }
+    getConversation(activeId, session.access_token).then(setActiveConversation);
+  }, [activeId, session]);
 
   function handleSelect(id) {
     setActiveId(id);
@@ -36,6 +56,20 @@ export default function App() {
     refreshList();
   }
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+  }
+
+  // Still loading auth state
+  if (session === undefined) {
+    return <div className="auth-loading">Loading…</div>;
+  }
+
+  // Not logged in — show auth page
+  if (!session) {
+    return <AuthPage />;
+  }
+
   return (
     <div className="app-shell">
       <ConversationList
@@ -43,11 +77,14 @@ export default function App() {
         activeId={activeId}
         onSelect={handleSelect}
         onNew={handleNew}
+        userEmail={session.user.email}
+        onLogout={handleLogout}
       />
       <ChatWindow
         key={sessionKey}
         conversation={activeConversation}
         conversationId={activeId}
+        accessToken={session.access_token}
         onConversationCreated={handleConversationCreated}
         onMessagesChange={refreshList}
       />

@@ -26,12 +26,14 @@ create type inference_status as enum ('SUCCESS', 'ERROR', 'TIMEOUT');
 
 create table conversations (
   id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade,
   title       text,
   status      conversation_status not null default 'ACTIVE',
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 create index idx_conversations_status_updated on conversations (status, updated_at desc);
+create index idx_conversations_user_updated on conversations (user_id, updated_at desc);
 
 create table inference_logs (
   id              uuid primary key default gen_random_uuid(),

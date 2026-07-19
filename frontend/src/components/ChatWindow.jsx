@@ -11,7 +11,7 @@ const MODELS = [
   "gpt-4o-mini",
 ];
 
-export default function ChatWindow({ conversation, conversationId, onConversationCreated, onMessagesChange }) {
+export default function ChatWindow({ conversation, conversationId, accessToken, onConversationCreated, onMessagesChange }) {
   const [messages, setMessages] = useState(conversation?.messages ?? []);
   const [input, setInput] = useState("");
   const [model, setModel] = useState(MODELS[0]);
@@ -41,7 +41,7 @@ export default function ChatWindow({ conversation, conversationId, onConversatio
     setInput("");
 
     controllerRef.current = sendMessageStream(
-      { conversationId, model, message: currentInput },
+      { conversationId, model, message: currentInput, token: accessToken },
       {
         conversation: ({ conversationId: newId }) => {
           if (!conversationId) draftRef.currentNewId = newId;
@@ -79,7 +79,7 @@ export default function ChatWindow({ conversation, conversationId, onConversatio
 
   async function handleCancel() {
     controllerRef.current?.abort();
-    if (conversationId) await cancelConversation(conversationId);
+    if (conversationId) await cancelConversation(conversationId, accessToken);
     setStreaming(false);
   }
 
