@@ -4,7 +4,7 @@ A chatbot backed by an auto-instrumenting LLM SDK, an event-driven ingestion
 pipeline, and Supabase (Postgres) for messages + inference logs.
 
 **Stack:** React (frontend) · FastAPI (backend) · Supabase (DB) · RabbitMQ
-(event queue) · Anthropic + OpenAI (LLM providers).
+(event queue) · Anthropic + OpenAI + Groq (LLM providers).
 
 ```
 ┌──────────┐   SSE stream    ┌──────────────┐   sdk.chat()   ┌───────────────┐
@@ -35,7 +35,8 @@ pipeline, and Supabase (Postgres) for messages + inference logs.
 
 ```bash
 cp .env.example .env
-# fill in ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# fill in GROQ_API_KEY, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 # (and OPENAI_API_KEY if you want the gpt-4o models)
 docker compose up --build
 ```
@@ -64,6 +65,7 @@ uvicorn app.main:app --reload --port 4000
 
 # 3. Frontend
 cd frontend
+cp ../.env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 npm install
 npm run dev
 ```
@@ -115,12 +117,11 @@ throughput from chat traffic.
 **Database (deliverable 4).** Supabase project (Postgres underneath). See
 schema design decisions below.
 
-**Bonus items implemented:** multi-provider support (Anthropic + OpenAI
+**Bonus items implemented:** multi-provider support (Anthropic + OpenAI + Groq
 behind one interface), streaming responses (SSE + provider-level streaming),
 Docker Compose one-command setup, event-based architecture (RabbitMQ), PII
-redaction on log previews. Not implemented: live dashboards (see "what I'd
-improve"), k8s deployment (documented approach instead, since that needs
-infra I don't have in this environment).
+redaction on log previews, JWT authentication. Not implemented: live dashboards 
+(see "what I'd improve").
 
 ## 3. Schema design decisions
 
@@ -155,11 +156,11 @@ ORM's migration tool.
   would double storage and double the PII surface for no query benefit.
 - **RLS is enabled on every table, but the backend connects with the
   `service_role` key**, which bypasses it. That's a deliberate tradeoff for
-  this app's shape: the frontend never talks to Supabase directly, only to
-  our own FastAPI service, so there's no browser-facing client that needs
-  row-level policies yet. RLS is left on (rather than disabled) so that if
-  a browser client is ever added later, it fails closed by default instead
-  of open.
+  this app's shape: the frontend talks to Supabase Auth directly for login,
+  but all database reads/writes go through our own FastAPI service, so there's no
+  browser-facing DB client that needs row-level policies yet. RLS is left on
+  (rather than disabled) so that if a browser client is ever added later,
+  it fails closed by default instead of open.
 
 ## 4. Tradeoffs made
 
@@ -211,11 +212,6 @@ ORM's migration tool.
   process, instead of dropping after one reject.
 - **Kafka migration path** if a second independent consumer appears (e.g.
   a billing pipeline reading the same log stream as the dashboard).
-- **k8s manifests.** I've documented the deployment shape below rather than
-  standing up a live cluster, since that requires infrastructure/credentials
-  I don't have in this environment. See `ARCHITECTURE.md`.
-- **Auth.** There's currently no auth on the API — fine for a take-home demo,
-  not for anything real.
 
 See `ARCHITECTURE.md` for ingestion flow, logging strategy, scaling, and
 failure-handling notes in more depth.

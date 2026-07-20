@@ -5,7 +5,7 @@ Design goal is auto-instrumentation: any code path that wants to talk to an
 LLM calls sdk.chat(...) instead of a provider SDK directly, and every
 metadata field the assignment lists is captured automatically, with zero
 extra code at the call site. The SDK itself doesn't know about any specific
-provider (Anthropic, OpenAI, ...) — the caller passes in a `get_provider`
+provider (Anthropic, OpenAI, Groq, ...) — the caller passes in a `get_provider`
 resolver, so this package stays a generic, reusable wrapper rather than
 being coupled to one app's provider setup. If the host app adds a new
 provider to its own resolver, calls through it are instrumented for free —
